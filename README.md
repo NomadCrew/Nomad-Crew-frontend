@@ -113,7 +113,7 @@ npm run typescript
 		<tr>
             <td align="center">
                 <a href="https://github.com/naqeebali-shamsi">
-                    <img src="https://avatars.githubusercontent.com/u/37825325?v=4" width="100;" alt="naqeebali-shamsi"/>
+                    <img src="https://private-avatars.githubusercontent.com/u/37825325?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTEiLCJleHAiOjE3MzQ2NTY4MjAsIm5iZiI6MTczNDY1NTYyMCwicGF0aCI6Ii91LzM3ODI1MzI1In0.fYHsOp9NVQyqR1aEukrVbd35XRvMBOyh3OVl-bqck20&v=4" width="100;" alt="naqeebali-shamsi"/>
                     <br />
                     <sub><b>Naqeebali Shamsi</b></sub>
                 </a>
