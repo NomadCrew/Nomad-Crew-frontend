@@ -9,17 +9,23 @@ import {
   UpdateTripStatusResponse,
 } from '@/src/types/trip';
 import { API_PATHS } from '@/src/utils/api-paths';
+import { API_CONFIG } from '@/src/api/env';
 import {
   WebSocketEvent,
   WebSocketConnectionState,
   isTripEvent,
+  isTodoEvent,
+  isWebSocketEvent,
 } from '@/src/types/events';
+import { useTodoStore } from '@/src/store/useTodoStore';
+import { mapWeatherCode } from '@/src/utils/weather';
+import { useAuthStore } from '@/src/store/useAuthStore';
 
 interface TripState {
   trips: Trip[];
   loading: boolean;
   error: string | null;
-  wsConnection: WebSocketConnectionState | null;
+  // Removed wsConnection
   // Core operations
   createTrip: (input: CreateTripInput) => Promise<Trip>;
   updateTrip: (id: string, input: UpdateTripInput) => Promise<Trip>;
@@ -29,23 +35,26 @@ interface TripState {
   getTripById: (id: string) => Trip | undefined;
   // Status operations
   updateTripStatus: (id: string, status: TripStatus) => Promise<void>;
-  // WebSocket operations
-  connectToTrip: (tripId: string) => void;
-  disconnectFromTrip: (tripId: string) => void;
+  // WebSocket operations (simplified)
   handleTripEvent: (event: WebSocketEvent) => void;
+  // Removed connectToTrip/disconnectFromTrip
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
   trips: [],
   loading: false,
   error: null,
-  wsConnection: null,
 
   createTrip: async (tripData: CreateTripInput) => {
     set({ loading: true, error: null });
     try {
       const response = await api.post<Trip>(API_PATHS.trips.create, {
         ...tripData,
+        destination: {
+          address: tripData.destination.address,
+          coordinates: tripData.destination.coordinates,
+          placeId: tripData.destination.placeId
+        },
         status: 'PLANNING' as TripStatus,
       });
       set(state => ({
@@ -133,43 +142,37 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   // WebSocket Operations
-  connectToTrip: (tripId: string) => {
-    const wsUrl = `${api.defaults.baseURL}${API_PATHS.trips.ws(tripId)}`.replace('http', 'ws');
-    try {
-      const connection = new WebSocket(wsUrl);
-      connection.onmessage = (event) => {
-        const tripEvent = JSON.parse(event.data);
-        get().handleTripEvent(tripEvent);
-      };
-      connection.onerror = (errorEvent) => {
-        set({ error: `WebSocket error: ${errorEvent.type}` });
-      };
-      connection.onclose = () => {
-        set({ wsConnection: null });
-      };
-      set({ wsConnection: { instance: connection, status: 'CONNECTED', reconnectAttempt: 0 } });
-    } catch (error) {
-      console.error('Trip WebSocket connection failed:', error);
-      set({ wsConnection: { instance: null, status: 'DISCONNECTED', reconnectAttempt: 0 } });
-    }
-  },
-
-  disconnectFromTrip: (tripId: string) => {
-    const { wsConnection } = get();
-    if (wsConnection?.instance) {
-      wsConnection.instance.close();
-      set({ wsConnection: null });
-    }
-  },
-
   handleTripEvent: (event: WebSocketEvent) => {
-    if (!isTripEvent(event)) return;
+    if (isTripEvent(event)) {
+      let updatedTrip: Partial<Trip> = {};
 
-    const updatedTrip = event.payload;
-    set(state => ({
-      trips: state.trips.map(trip =>
-        trip.id === updatedTrip.id ? { ...trip, ...updatedTrip } : trip
-      ),
-    }));
+      if (event.type === 'WEATHER_UPDATED') {
+        console.log(
+          'Received WEATHER_UPDATED event for trip:',
+          event.payload.tripId,
+          'Temperature:', event.payload.temperature_2m,
+          'Weather code:', event.payload.weather_code
+        );
+        updatedTrip = {
+          weatherTemp: `${Math.round(event.payload.temperature_2m)}°C`,
+          weatherCondition: mapWeatherCode(event.payload.weather_code),
+          id: event.payload.tripId
+        };
+      } else if (event.type === 'TRIP_UPDATED') {
+        updatedTrip = event.payload;
+      }
+
+      if (Object.keys(updatedTrip).length > 0) {
+        set(state => ({
+          trips: state.trips.map(trip => 
+            trip.id === updatedTrip.id ? { ...trip, ...updatedTrip } : trip
+          )
+        }));
+      }
+    }
+    
+    if (isTodoEvent(event)) {
+      useTodoStore.getState().handleTodoEvent(event);
+    }
   },
 }));
